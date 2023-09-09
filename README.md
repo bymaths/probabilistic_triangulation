@@ -48,7 +48,7 @@ If you find this project useful for your research, please consider citing:
 @article{hu2023pose,
   title={Probabilistic Triangulation for Uncalibrated Multi-View 3D Human Pose Estimation},
   author={Boyuan Jiang, Lei Hu, Shihong Xia}
-  journal={IEEE Transactions on Visualization and Computer Graphics},
+  journal={IEEE International Conference on Computer Vision},
   year={2023},
   publisher={IEEE}
 }
