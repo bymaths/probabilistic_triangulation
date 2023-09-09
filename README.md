@@ -38,7 +38,7 @@ python train.py --cfg config/H36M.yaml --data ./data
 
 ## Comments
 
-The data processing code is based on the project of  [h36m-fetch](https://github.com/anibali/h36m-fetch) and [learnable triangulation](https://github.com/karfly/learnable-triangulation-pytorch)](https://github.com/anibali/h36m-fetch).
+The data processing code is based on the project of  [h36m-fetch](https://github.com/anibali/h36m-fetch) and [learnable triangulation](https://github.com/karfly/learnable-triangulation-pytorch).
 
 ## Citation
 
