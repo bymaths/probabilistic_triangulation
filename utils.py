@@ -4,6 +4,16 @@ import cv2
 
 JOINT_LINKS = [(0,1),(0,2),(1,3),(2,4),(0,5),(0,6),(5,7),(7,9),(6,8),(8,10),(5,11),(6,12),(11,12),(11,13),(13,15),(12,14),(14,16)]
 
+def cal_mpjpe(points3d, points2d, R, t):
+    """
+    Args:
+        points3d : (...,J,3)
+        points2d : (...,V,J,2)
+        R : (...,V,3,3)
+        t: (...,V,3,1)
+    """
+    return (homo_to_eulid((R[...,None,:,:] @ points3d[...,None,:,:,None] + t[...,None,:,:]).squeeze(-1)) - points2d ).mean()
+
 def eulid_to_humo(points):
     """
         points: (...,N,M)
@@ -44,10 +54,16 @@ class Camera():
         self.n_joint = n_joint
         self.points2d = np.zeros(self.n_view,2,self.n_joint)
         self.confidence = np.zeros(self.n_joint)
-        self.R = np.eyes(3)
+        self.R = np.eye(3)
         self.t = np.zeros((3,1))
 
-    def update(self, R,t):
+    def update_points(self, points2d, confidence):
+        assert points2d.shape == self.points2d.shape
+        assert confidence.shape == self.confidence.shape
+        self.points2d = points2d
+        self.confidence = confidence
+
+    def update_Rt(self, R,t):
         self.R = R
         self.t = t
 
@@ -65,8 +81,24 @@ class Calibration():
     def update(self, points2d, confidence):
         assert points2d.shape == self.points2d.shape
         assert confidence.shape == self.confidence.shape
-        self.points2d = points2d
-        self.confidence = confidence
+        if isinstance(points2d,np.ndarray):
+            pass
+        if torch.is_tensor(points2d):
+            points2d = points2d.to_numpy()
+        else:
+            raise TypeError("Works Only with numpy arrays and Pytorch tensors")
+
+        if isinstance(confidence,np.ndarray):
+            pass
+        elif torch.is_tensor(points2d):
+            confidence = confidence.to_numpy()
+        else:
+            raise TypeError("Works Only with numpy arrays and Pytorch tensors")
+        
+        for i in range(self.n_view):
+            self.cameras.update_points(points2d[i], confidence[i])
+
+
 
     def get_vaild_index(self, confi):
         """
