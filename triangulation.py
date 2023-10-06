@@ -1,4 +1,8 @@
 import torch
+from distribution import AngularCentralGaussian, cholesky_wrapper
+from pyro.distributions import MultivariateStudentT
+from utils import homo_to_eulid, eulid_to_humo, matrix_to_quaternion,quaternion_to_matrix
+import torch.nn.functional as F
 
 def cal_mpjpe_batch(points3d, points2d, R, t):
     """
@@ -101,5 +105,6 @@ class ProbabilisticTriangulation():
         R = torch.cat( [ torch.eye(3)[None,None].expand(self.n_batch,1,3,3), quaternion_to_matrix(self.expect_quan) ] ,dim=-3)
         t = torch.cat([torch.zeros(self.n_batch,1,3) ,self.mu_t] , dim = -2).unsqueeze(-1)
         return R,t
+
 
 

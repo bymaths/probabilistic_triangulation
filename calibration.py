@@ -1,3 +1,7 @@
+import torch
+from triangulation import ProbabilisticTriangulation
+
+
 class CalibrationBatch():
     def __init__(self, points2d, confi2d):
         """
