@@ -13,8 +13,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '5,6,7'
 
 
 cfg = {
-    'root_path': '/data/jiangboyuan/human36m/processed',
-    'labels_path': '/data/jiangboyuan/human36m/extra/human36m-multiview-labels-GTbboxes.npy',
+    'root_path': '/data/human36m/processed',
+    'labels_path': '/data/human36m/extra/human36m-multiview-labels-GTbboxes.npy',
     'lr':1e-3,
     'num_epoch':300,
     'batch_size_train': 1024,
