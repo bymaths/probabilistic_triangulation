@@ -42,6 +42,7 @@ python train2d.py
 ```
 
 Train the 3d estimator, which by default will use the pre-trained model of the 2d backbone:
+(pre-trained model will upload today)
 
 ```python
 python train3d.py
