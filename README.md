@@ -35,18 +35,50 @@ human3.6m
 
 ### 2. Quick Start
 
+Use conda to create an environment, or a newer version of pytorch：
+
+```
+conda env create -f environment.yaml
+```
+
+Perform inference on [pretrained models](https://drive.google.com/file/d/11baGjN9-iC6AzORrPSLJ_Oyk6kCLiEH6/view?usp=drive_link):
+
+```python
+python infer3d.py
+```
+
+The following results will be obtained, where x3d/l2 is mpjpe:
+```
+loss 4.177016958594322
+loss/hm 2.6981436171952415
+loss/x3d 5.655890337684575
+x2d/l1 16.779179317109726
+x2d/l2 13.22389983604936
+x3d/l1 38.431529241449695
+x3d/l2 26.103624186095068
+```
+
+Train the 3d estimator, which by default will use the pretrained model of the 2d backbone:
+
+```python
+python train3d.py
+```
+
 Train the 2d backbone:
 
 ```python
 python train2d.py
 ```
 
-Train the 3d estimator, which by default will use the pre-trained model of the 2d backbone:
-(pre-trained model will upload today)
+### 3. Some training suggestions
 
-```python
-python train3d.py
-```
+1. When the model parameter count is small, Human3.6m has a single background that tends to overfit the model (probably because the model uses color as a key point feature). We added some color and brightness data augmentation during training to combat it. But this can't completely solve the field scene. Pre-training the model with a broader dataset would solve this problem.
+
+2. Human3.6m has a lot of data duplicates, and spaced use can quickly validate the training results.
+
+3. The voxel fusion multi-view approach leads to a rich physics prior, but there is a bottleneck in acceleration. In the new version of the code, we use orientation + sampled features as inputs, which can greatly speed up the speedup.
+
+4.In training, the fusion part uses the generated data for pre-training and is fine-tuned in subsequent training, which can achieve better generalization.
 
 
 
