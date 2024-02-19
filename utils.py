@@ -60,3 +60,5 @@ def homo_to_eulid(points):
         return points[...,:-1] / points[...,-1,None]
     else:
         raise TypeError("Works Only with numpy arrays and Pytorch tensors")
+
+

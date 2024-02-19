@@ -316,23 +316,24 @@ class UpHead(nn.Module):
             nn.UpsamplingBilinear2d(scale_factor=2)
         )
         self.proj2 = nn.Sequential(
-            MobileConv(int(128 * width_multipliers[1]), 256, stride=1, inference_mode=inference_mode),
+            MobileConv(int(128 * width_multipliers[1]), int(64 * width_multipliers[0]), stride=1, inference_mode=inference_mode),
+            nn.UpsamplingBilinear2d(scale_factor=2)
+            # MobileConv(256, 128, stride=1, inference_mode=inference_mode),
+        )
+        self.proj1 = nn.Sequential(
+            MobileConv(int(64 * width_multipliers[0]), 256, stride=1, inference_mode=inference_mode),
             # nn.UpsamplingBilinear2d(scale_factor=2)
             MobileConv(256, 128, stride=1, inference_mode=inference_mode),
         )
-        # self.proj1 = nn.Sequential(
-        #     MobileConv(int(64 * width_multipliers[0]), min(64,int(64 * width_multipliers[0])), stride=1, inference_mode=inference_mode),
-        #     # nn.UpsamplingBilinear2d(scale_factor=2)
-        # )
         # self.proj0 = nn.Sequential(
         #     MobileConv( min(64,int(64 * width_multipliers[0])), 64, stride=1, inference_mode=inference_mode),
         # )
 
-    def forward(self, x2,x3,x4):
+    def forward(self, x1, x2, x3, x4):
         elt3 = x3 + self.proj4(x4) 
         elt2 = x2 + self.proj3(elt3)
-        out = self.proj2(elt2)
-        # elt1 = x1 + self.proj2(elt2)
+        elt1 = x1 + self.proj2(elt2)
+        out = self.proj1(elt1)
         # elt0 = x0 + self.proj1(elt1)
         # out = self.proj0(elt0)
         return out
@@ -462,7 +463,7 @@ class Pose2d(nn.Module):
         x2 = self.stage2(x1)
         x3 = self.stage3(x2)
         x4 = self.stage4(x3)
-        feature = self.upstage(x2,x3,x4)
+        feature = self.upstage(x1,x2,x3,x4)
         # feature = self.neck(x)
         # out = self.gap(feature)
         # out = out.view(out.size(0), -1)
@@ -492,19 +493,29 @@ def reparameterize_model(model: torch.nn.Module) -> nn.Module:
     return model
 
 
-
-class ProbTri(nn.Module):
-    def __init__(self, cfg):
+class Fusion(nn.Module):
+    def __init__(self,cfg):
         super().__init__()
         self.cfg = cfg
-        self.backbone = pose2d_model(num_classes=cfg['num_keypoints'])
-        self.embed = nn.Linear(4,128)
+        self.embed = nn.Sequential(
+            nn.Linear(4,1024),
+            nn.ReLU(),
+            nn.Linear(1024,512),
+            nn.ReLU(),
+            nn.Linear(512,256),
+            nn.ReLU(),
+            nn.Linear(256,128),
+        )
+        
         self.pose0 = nn.Sequential(
             nn.Linear(cfg['num_keypoints']*256, 1024),
             nn.ReLU(),
             nn.Linear(1024,512),
             nn.ReLU(),
             nn.Linear(512,256),
+            nn.ReLU(),
+            # nn.Dropout(p=0.5),
+            nn.Linear(256,256),
         )
         self.pose1 = nn.Sequential(
             nn.Linear(cfg['num_views']*256, 1024),
@@ -513,14 +524,37 @@ class ProbTri(nn.Module):
             nn.ReLU(),
             nn.Linear(512,cfg['num_keypoints']*3),
         )
+    
+    def forward(self, xdir, xfeat=None):
+        B,V,J,_ = xdir.shape
+        xdir = self.embed(xdir)
+
+        if xfeat == None:
+            xfeat = torch.zeros_like(xdir)
+        # (B,V,J,256) -> (B,V,J*256)
+        x = torch.cat([xdir,xfeat], dim=-1).view(B,V,J*256)
+        x = self.pose0(x) # (B,V,256)
+        x = x.view(B,-1)
+        out = self.pose1(x).view(B,-1,3)
+        return out
+    
+
+
+class ProbTri(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self.backbone = pose2d_model(num_classes=cfg['num_keypoints'])
+        self.fusion = Fusion(cfg)
         self.freeze()
 
     def freeze(self):
-        for layer in [self.backbone]:
-            for param in layer.parameters():
-                param.requires_grad = False
+        self.backbone.freeze()
+        # for layer in [self.backbone]:
+        #     for param in layer.parameters():
+        #         param.requires_grad = False
         
-        for layer in [self.embed, self.pose0, self.pose1]:
+        for layer in [self.fusion]:
             for param in layer.parameters():  
                 param.requires_grad = True
             layer.train()
@@ -553,24 +587,22 @@ class ProbTri(nn.Module):
 
         # coord (BV,J,2)
         coord = ind_xy.float() + reg_val
+        out_x2d = coord.clone()* image_w / W
+    
+        # (BV,1,3,3)@(BV,J,3,1) -> (BV,J,3,1)
+        xdir = (torch.inverse(K)[:,None] @ eulid_to_homo(coord * image_w / W)[...,None]).squeeze(-1)
+        xdir = torch.cat([xdir, max_val[...,None]], dim = -1).view(B,V,J,4)
+
         coord[:, :, 0] = (coord[:, :, 0] / (W - 1)) * 2 - 1 
         coord[:, :, 1] = (coord[:, :, 1] / (H - 1)) * 2 - 1  
         coord = coord.unsqueeze(1)
-        x0 = F.grid_sample(feature, coord, mode='bilinear', align_corners=True)
-        x0 = x0.squeeze(2).transpose(1, 2) 
+        xfeat = F.grid_sample(feature, coord, mode='bilinear', align_corners=True)
+        xfeat = xfeat.squeeze(2).transpose(1, 2).view(B,V,J,128)
 
-        # (BV,1,3,3)@(BV,J,3,1) -> (BV,J,3,1)
-        x1 = (( torch.inverse(K[:,None]) @ eulid_to_homo(ind_xy.float())[...,None])).squeeze(-1)
-        x1 = torch.cat([x1, max_val[...,None]], dim = -1)
-        x1 = self.embed(x1)
+        # out_x3d = self.fusion(xdir, xfeat)
+        out_x3d = self.fusion(xdir)
 
-        # (BV,J,256) -> (B,V,J*256)
-        x = torch.cat([x0,x1], dim=-1).view(B,V,J*256)
-        x = self.pose0(x) # (B,V,256)
-        x = x.view(B,-1)
-        out = self.pose1(x).view(B,-1,3)
-        return out
-
+        return out_x3d, out_hm.view(B, V, J, H,W), out_reg.view(B,V,J,2,H,W), out_x2d.view(B,V,J,2)
 
 
 

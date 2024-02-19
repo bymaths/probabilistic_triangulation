@@ -68,6 +68,8 @@ class NormSkeleton():
         sample['x3d'] = (x3d-x3d[self.root_id]).astype(np.float32)
         sample['x2d'] = x2d[:,:2].astype(np.float32)
         sample['K'] = sample['camera'].K
+        sample['R'] = sample['camera'].R
+        sample['t'] = sample['camera'].t
         del sample['camera']
         return sample
 
@@ -174,7 +176,7 @@ class PhotometricDistort():
     
 
 class GenHeatmap():
-    def __init__(self, num_keypoints, image_size = 256, heatmap_size = 32):
+    def __init__(self, num_keypoints, image_size = 256, heatmap_size = 64):
         self.num_keypoints = num_keypoints
         self.image_size = image_size
         self.heatmap_size = heatmap_size

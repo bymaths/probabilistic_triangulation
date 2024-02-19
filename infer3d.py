@@ -5,12 +5,11 @@ from torch.utils.data import Dataset, DataLoader
 import cv2
 import matplotlib.pyplot as plt
 from utils import *
-from trainer import Trainer
+from trainer import AverageMeter
 from datasets import MultiHuman36M
 from models import ProbTri
 from loss import Net3d
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
-
+from tqdm import tqdm
 
 cfg = {
     'root_path': '/data/human36m/processed',
@@ -33,19 +32,10 @@ cfg = {
     'save_dir': '/logs/pose3d',
     'use_tag':False,
     'data_skip_train':8,
-    'data_skip_test':4,
+    'data_skip_test':1,
 }
 
-train_db = MultiHuman36M(cfg, is_train=True)
 test_db = MultiHuman36M(cfg, is_train=False)
-train_loader = DataLoader(
-    train_db,
-    batch_size=cfg['batch_size_train'], 
-    shuffle=True,
-    num_workers = cfg['num_workers'],
-    pin_memory = True,
-    drop_last=True,
-)
 test_loader = DataLoader(
     test_db,
     batch_size=cfg['batch_size_test'], 
@@ -55,9 +45,8 @@ test_loader = DataLoader(
     drop_last=True,
 )
 
-
 # trainer
-model = ProbTri(cfg)
+model = ProbTri(cfg).cuda()
 if 'backbone_path' in cfg:
     pretrain_dict = torch.load(cfg['backbone_path'])
     missing, unexpected = model.backbone.load_state_dict(pretrain_dict,strict=False)
@@ -72,8 +61,25 @@ if 'model_path' in cfg:
     pretrain_dict = torch.load(cfg['model_path'])
     missing, unexpected = model.load_state_dict(pretrain_dict,strict=False)
     print('missing length', len(missing), 'unexpected', len(unexpected) , '\n')
-model = torch.nn.DataParallel(model, device_ids=[0,1,2,3]).cuda()
 
 net = Net3d(cfg, model)
-trainer = Trainer(cfg, net)
-trainer.run(train_loader, test_loader)
+net.eval()
+torch.set_grad_enabled(False)
+
+
+avg_loss_stats = {}
+for iter_id, batch in tqdm(enumerate(test_loader)):
+    for key in batch:
+        if isinstance(batch[key], torch.Tensor):
+            batch[key] = batch[key].to(device = cfg['device'], non_blocking=True)
+
+    output, loss, loss_stats = net(batch)
+    if 'loss' not in avg_loss_stats:
+        for key in loss_stats:
+            avg_loss_stats[key] = AverageMeter()
+    
+    for key in loss_stats:
+        avg_loss_stats[key].update(loss_stats[key].item(), test_loader.batch_size)
+
+for k, v in avg_loss_stats.items():
+    print(k, v.avg)

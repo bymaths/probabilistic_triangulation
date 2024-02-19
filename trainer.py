@@ -162,7 +162,7 @@ class Trainer():
                     avg_loss_stats[key] = AverageMeter()
                     
             for key in loss_stats:
-                avg_loss_stats[key].update(loss_stats[key].item(), batch['image'].size(0))
+                avg_loss_stats[key].update(loss_stats[key].item(), data_loader.batch_size)
             
         return avg_loss_stats
         
