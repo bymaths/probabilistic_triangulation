@@ -72,13 +72,15 @@ python train2d.py
 
 ### 3. Some training suggestions
 
-1. When the model parameter count is small, Human3.6m has a single background that tends to overfit the model (probably because the model uses color as a key point feature). We added some color and brightness data augmentation during training to combat it. But this can't completely solve the field scene. Pre-training the model with a broader dataset would solve this problem.
+1. While training, it was found that the estimation accuracy of the 2D pose very much affects the results, the mpjpe can be up to 26mm for 384x384 inputs, but only 34mm for 256x256 inputs.
 
-2. Human3.6m has a lot of data duplicates, and spaced use can quickly validate the training results.
+2. When the model parameter count is small, Human3.6m has a single background that tends to overfit the model (probably because the model uses color as a key point feature). We added some color and brightness data augmentation during training to combat it. But this can't completely solve the field scene. Pre-training the model with a broader dataset would solve this problem.
 
-3. The voxel fusion multi-view approach leads to a rich physics prior, but there is a bottleneck in acceleration. In the new version of the code, we use orientation + sampled features as inputs, which can greatly speed up the speedup.
+3. Human3.6m has a lot of data duplicates, and spaced use can quickly validate the training results.
 
-4.In training, the fusion part uses the generated data for pre-training and is fine-tuned in subsequent training, which can achieve better generalization.
+4. The voxel fusion multi-view approach leads to a rich physics prior, but there is a bottleneck in acceleration. In the new version of the code, we use orientation + sampled features as inputs, which can greatly speed up the speedup.
+
+5. In training, the fusion part uses the generated data for pre-training and is fine-tuned in subsequent training, which can achieve better generalization.
 
 
 
