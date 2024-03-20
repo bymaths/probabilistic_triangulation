@@ -599,8 +599,8 @@ class ProbTri(nn.Module):
         xfeat = F.grid_sample(feature, coord, mode='bilinear', align_corners=True)
         xfeat = xfeat.squeeze(2).transpose(1, 2).view(B,V,J,128)
 
-        # out_x3d = self.fusion(xdir, xfeat)
-        out_x3d = self.fusion(xdir)
+        out_x3d = self.fusion(xdir, xfeat)
+        # out_x3d = self.fusion(xdir)
 
         return out_x3d, out_hm.view(B, V, J, H,W), out_reg.view(B,V,J,2,H,W), out_x2d.view(B,V,J,2)
 
